@@ -57,12 +57,12 @@ const Cell = ({ cell, onClick, onRightClick }) => {
     >
       {cell.revealed
         ? cell.mine
-          ? '??'
+          ? '💣'
           : cell.count > 0
           ? cell.count
           : ''
         : cell.flagged
-        ? '??'
+        ? '🚩'
         : ''}
     </div>
   );
@@ -75,6 +75,8 @@ const App = () => {
   const [account, setAccount] = useState(null);
   const [signer, setSigner] = useState(null);
   const [hasTurn, setHasTurn] = useState(false);
+  const [playsPurchased, setPlaysPurchased] = useState(0);
+  const [playsUsed, setPlaysUsed] = useState(0);
 
   const connectWallet = async () => {
     if (window.ethereum) {
@@ -90,7 +92,7 @@ const App = () => {
         console.error("Wallet connection error:", err);
       }
     } else {
-      alert("?? Please install Metamask to use this feature.");
+      alert("🦊 Please install Metamask to use this feature.");
     }
   };
 
@@ -98,6 +100,8 @@ const App = () => {
     setAccount(null);
     setSigner(null);
     setHasTurn(false);
+    setPlaysPurchased(0);
+    setPlaysUsed(0);
   };
 
   const purchaseGame = async () => {
@@ -106,7 +110,7 @@ const App = () => {
       return;
     }
 
-    const contractAddress = "0x11e6c3B1CD4AE2FcC6F1C60500e876E43b0115b7"; // Replace this
+    const contractAddress = "0xc95F821C2299d8e4845aEbc6164D9973cbF68c9F";
     const abi = [
       {
         "inputs": [],
@@ -124,11 +128,12 @@ const App = () => {
         value: ethers.parseEther("0.01")
       });
       await tx.wait();
-      alert("? Purchase successful! You can now play.");
+      alert("✅ Purchase successful! You received 5 turns.");
       setHasTurn(true);
+      setPlaysPurchased(playsPurchased + 5);
     } catch (error) {
       console.error("Purchase failed:", error);
-      alert("? Transaction failed. See console for details.");
+      alert("❌ Transaction failed. See console for details.");
     }
   };
 
@@ -137,6 +142,7 @@ const App = () => {
     b[r][c].revealed = true;
     if (b[r][c].mine) {
       setGameOver(true);
+      setPlaysUsed(prev => prev + 1);
       return;
     }
     if (b[r][c].count === 0) {
@@ -170,11 +176,12 @@ const App = () => {
   };
 
   useEffect(() => {
-    if (!gameOver) {
+    if (!gameOver && !win) {
       const totalCells = BOARD_SIZE * BOARD_SIZE;
       const revealed = board.flat().filter(cell => cell.revealed).length;
       if (revealed === totalCells - MINES_COUNT) {
         setWin(true);
+        setPlaysUsed(prev => prev + 1);
       }
     }
   }, [board, gameOver]);
@@ -183,26 +190,34 @@ const App = () => {
     setBoard(generateBoard());
     setGameOver(false);
     setWin(false);
-    setHasTurn(false);
+    setHasTurn(playsPurchased - playsUsed - 1 >= 0);
   };
+
+  const playsRemaining = Math.max(playsPurchased - playsUsed, 0);
 
   return (
     <div className="game">
       <div className="wallet-bar">
         <button onClick={account ? disconnectWallet : connectWallet} className="wallet-button">
-          {account ? `?? ${account.slice(0, 6)}...${account.slice(-4)}` : "Connect Wallet"}
+          {account ? `🔗 ${account.slice(0, 6)}...${account.slice(-4)}` : "Connect Wallet"}
         </button>
         {account && !hasTurn && (
           <button onClick={purchaseGame} className="wallet-button">
-            ?? Purchase Turn (0.01 MON)
+            🪙 Purchase Turn (0.01 MON)
           </button>
         )}
       </div>
 
       <h1>Minesweeper</h1>
-      {gameOver && <h2 className="status">?? Game Over! You hit a mine!</h2>}
-      {win && <h2 className="status">?? You Win!</h2>}
-      {!gameOver && !win && !hasTurn && <h2 className="status">?? Purchase a turn to play</h2>}
+      <div className="play-stats">
+        <span>📒 Purchased: {playsPurchased}</span>
+        <span>🕹️ Played: {playsUsed}</span>
+        <span>📘 Remaining: {playsRemaining}</span>
+      </div>
+
+      {gameOver && <h2 className="status">💥 Game Over! You hit a mine!</h2>}
+      {win && <h2 className="status">🎉 You Win!</h2>}
+      {!gameOver && !win && playsRemaining === 0 && <h2 className="status">🪙 Purchase a turn to play</h2>}
 
       <div className="board">
         {board.map((row, r) => (
@@ -219,7 +234,7 @@ const App = () => {
         ))}
       </div>
 
-      <button className="reset" onClick={resetGame}>?? Reset</button>
+      <button className="reset" onClick={resetGame}>🔄 Reset</button>
     </div>
   );
 };
